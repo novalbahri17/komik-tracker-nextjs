@@ -1,117 +1,92 @@
-# Project Requirements Document: codeguide-starter
-
----
+# Project Requirements Document: Komik Tracker Next.js
 
 ## 1. Project Overview
+Komik Tracker is a web application that helps comic book enthusiasts securely track, manage, and analyze their personal collections. Users can register, log in, add new comics with detailed metadata (type, status, genre, platform), and view interactive charts that visualize their reading progress and collection breakdown. The app solves the common problem of scattered, manual record-keeping by offering a centralized, structured platform with robust data validation and role-based controls.
 
-The **codeguide-starter** project is a boilerplate web application that provides a ready-made foundation for any web project requiring secure user authentication and a post-login dashboard. It sets up the common building blocks—sign-up and sign-in pages, API routes to handle registration and login, and a simple dashboard interface driven by static data. By delivering this skeleton, it accelerates development time and ensures best practices are in place from day one.
-
-This starter kit is being built to solve the friction developers face when setting up repeated common tasks: credential handling, session management, page routing, and theming. Key objectives include: 1) delivering a fully working authentication flow (registration & login), 2) providing a gated dashboard area upon successful login, 3) establishing a clear, maintainable project structure using Next.js and TypeScript, and 4) demonstrating a clean theming approach with global and section-specific CSS. Success is measured by having an end-to-end login journey in under 200 lines of code and zero runtime type errors.
-
----
+This project is being built to deliver a production-grade experience focused on security, performance, and ease of use. Key objectives include:
+- A secure authentication system using JWTs and HttpOnly cookies to protect user sessions.
+- A responsive, themeable UI powered by Tailwind CSS and shadcn/ui for light/dark mode support.
+- Real-time analytics with Pie and Bar charts to help users understand their collection at a glance.
+- A scalable backend with Prisma ORM and MySQL/TiDB support for consistent data integrity.
 
 ## 2. In-Scope vs. Out-of-Scope
+**In-Scope (First Version)**
+- User authentication (register, login, logout) with JWT and bcrypt.
+- Password reset via email using Resend.
+- Comic management (Create, Read, Update, Delete) with soft-delete (recycle bin).
+- Master data management (types, statuses, genres, platforms) with role-based access (member vs. admin).
+- Interactive dashboard showing KPIs and charts (react-chartjs-2).
+- Responsive UI components (cards, tables, dialogs, toasts) with Tailwind CSS + shadcn/ui.
+- Form handling and validation using react-hook-form and Zod.
+- Theme persistence (light/dark) in local storage and user settings.
+- Docker + docker-compose for local development, Vercel deployment.
 
-### In-Scope (Version 1)
-- User registration (sign-up) form with validation
-- User login (sign-in) form with validation
-- Next.js API routes under `/api/auth/route.ts` handling:
-  - Credential validation
-  - Password hashing (e.g., bcrypt)
-  - Session creation or JWT issuance
-- Protected dashboard pages under `/dashboard`:
-  - `layout.tsx` wrapping dashboard content
-  - `page.tsx` rendering static data from `data.json`
-- Global application layout in `/app/layout.tsx`
-- Basic styling via `globals.css` and `dashboard/theme.css`
-- TypeScript strict mode enabled
-
-### Out-of-Scope (Later Phases)
-- Integration with a real database (PostgreSQL, MongoDB, etc.)
-- Advanced authentication flows (password reset, email verification, MFA)
-- Role-based access control (RBAC)
-- Multi-tenant or white-label theming
-- Unit, integration, or end-to-end testing suites
-- CI/CD pipeline and production deployment scripts
-
----
+**Out-of-Scope (Later Phases)**
+- Native mobile apps (iOS/Android).
+- Social or OAuth logins (Google, Facebook, etc.).
+- Offline or PWA support.
+- Bulk import/export beyond simple JSON export.
+- Community features (sharing, commenting, ratings).
+- Multi-language or localization.
 
 ## 3. User Flow
+A new visitor lands on the public landing page. They can click “Sign Up” to create an account with email and password. After registering, the system sends a welcome email and automatically logs them in. Alternatively, returning users click “Sign In” and provide credentials; upon success, an HttpOnly cookie with a JWT is set and they’re redirected to the protected dashboard.
 
-A new visitor lands on the root URL and sees a welcome page with options to **Sign Up** or **Sign In**. If they choose Sign Up, they fill in their email, password, and hit “Create Account.” The form submits to `/api/auth/route.ts`, which hashes the password, creates a new user session or token, and redirects them to the dashboard. If any input is invalid, an inline error message explains the issue (e.g., “Password too short”).
-
-Once authenticated, the user is taken to the `/dashboard` route. Here they see a sidebar or header defined by `dashboard/layout.tsx`, and the main panel pulls in static data from `data.json`. They can log out (if that control is present), but otherwise their entire session is managed by server-side cookies or tokens. Returning users go directly to Sign In, submit credentials, and upon success they land back on `/dashboard`. Any unauthorized access to `/dashboard` redirects back to Sign In.
-
----
+On the dashboard, users see a sidebar for navigation and a main content area displaying KPIs (total comics, reading progress) plus interactive Pie and Bar charts. From the sidebar they access:
+- **Comics**: view a paginated, searchable list; add/edit/delete entries via modal forms.
+- **Master Data**: manage types, statuses, genres, and platforms (admins only for default data).
+- **Recycle Bin**: restore or permanently delete soft-deleted comics.
+- **Settings**: update profile, change password, toggle light/dark theme.
 
 ## 4. Core Features
-
-- **Sign-Up Page (`/app/sign-up/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Sign-In Page (`/app/sign-in/page.tsx`)**: Form fields for email & password, client-side validation, POST to `/api/auth`.
-- **Authentication API (`/app/api/auth/route.ts`)**: Handles both registration and login based on HTTP method, integrates password hashing (bcrypt) and session or JWT logic.
-- **Global Layout (`/app/layout.tsx` + `globals.css`)**: Shared header, footer, and CSS resets across all pages.
-- **Dashboard Layout (`/app/dashboard/layout.tsx` + `dashboard/theme.css`)**: Sidebar or top nav for authenticated flows, section-specific styling.
-- **Dashboard Page (`/app/dashboard/page.tsx`)**: Reads `data.json`, renders it as cards or tables.
-- **Static Data Source (`/app/dashboard/data.json`)**: Example dataset to demo dynamic rendering.
-- **TypeScript Configuration**: `tsconfig.json` with strict mode and path aliases (if any).
-
----
+- **Authentication & Authorization**: JWT-based, HttpOnly cookies, role info in token, custom Next.js middleware for route protection.
+- **Password Reset Flow**: Short-lived tokens, Resend service for email, secure reset endpoint.
+- **Comic CRUD**: Prisma-backed API routes with full create, read, update, soft-delete, and pagination/filtering.
+- **Master Data Management**: Enum endpoints enforcing `memberLocked` flags, RBAC logic.
+- **Interactive Dashboard**: Pie and Bar charts showing genre distribution, reading status, platform breakdown.
+- **Responsive UI Components**: Tailwind CSS + shadcn/ui (Button, Card, Table, Dialog, Toast).
+- **Form Handling & Validation**: react-hook-form + Zod for client/server validation.
+- **Theming & Settings**: Light/dark toggle, persistence in DB and localStorage.
+- **Recycle Bin**: Soft-delete implementation with `deletedAt` timestamp, restore and permanent delete.
+- **Containerization & Deployment**: Docker + docker-compose, Vercel with environment secrets.
 
 ## 5. Tech Stack & Tools
-
-- **Framework**: Next.js (App Router) for file-based routing, SSR/SSG, and API routes.
-- **Language**: TypeScript for type safety.
-- **UI Library**: React 18 for component-based UI.
-- **Styling**: Plain CSS via `globals.css` (global reset) and `theme.css` (sectional styling). Can easily migrate to CSS Modules or Tailwind in the future.
-- **Backend**: Node.js runtime provided by Next.js API routes.
-- **Password Hashing**: bcrypt (npm package).
-- **Session/JWT**: NextAuth.js or custom JWT logic (to be decided in implementation).
-- **IDE & Dev Tools**: VS Code with ESLint, Prettier extensions. Optionally, Cursor.ai for AI-assisted coding.
-
----
+- **Frontend**: Next.js (App Router), React, TypeScript
+- **Styling & UI**: Tailwind CSS, shadcn/ui, lucide-react icons
+- **Forms & Validation**: react-hook-form, Zod
+- **Charts**: react-chartjs-2 (Chart.js wrapper)
+- **Backend**: Next.js API Routes (Node.js), Prisma ORM
+- **Database**: MySQL-compatible (TiDB/MySQL) via Prisma
+- **Authentication**: jsonwebtoken, bcrypt
+- **Email Service**: Resend SDK for transactional emails
+- **Containerization**: Docker, docker-compose
+- **Deployment**: Vercel (Environment Variables: DATABASE_URL, JWT_SECRET, RESEND_API_KEY)
+- **IDE & Plugins** (optional): VSCode, Windsurf, Cursor
 
 ## 6. Non-Functional Requirements
-
-- **Performance**: Initial page load under 200 ms on a standard broadband connection. API responses under 300 ms.
-- **Security**:
-  - HTTPS only in production.
-  - Proper CORS, CSRF protection for API routes.
-  - Secure password storage (bcrypt with salt).
-  - No credentials or secrets checked into version control.
-- **Scalability**: Structure must support adding database integration, caching layers, and advanced auth flows without rewiring core app.
-- **Usability**: Forms should give real-time feedback on invalid input. Layout must be responsive (mobile > 320 px).
-- **Maintainability**: Code must adhere to TypeScript strict mode. Linting & formatting enforced by ESLint/Prettier.
-
----
+- **Performance**: SSR for initial load, SSR caching, API response ≤200 ms under normal load.
+- **Security**: OWASP Top 10 compliance, HttpOnly & Secure cookies, input sanitization, HTTPS only.
+- **Scalability**: Stateless API, horizontal scaling support.
+- **Usability**: Lighthouse score ≥90, WCAG 2.1 AA accessibility.
+- **Reliability**: 99.9% uptime, automated CI tests (unit, integration, E2E).
 
 ## 7. Constraints & Assumptions
-
-- **No Database**: Dashboard uses only `data.json`; real database integration is deferred.
-- **Node Version**: Requires Node.js >= 14.
-- **Next.js Version**: Built on Next.js 13+ App Router.
-- **Authentication**: Assumes availability of bcrypt or NextAuth.js at implementation time.
-- **Hosting**: Targets serverless or Node.js-capable hosting (e.g., Vercel, Netlify).
-- **Browser Support**: Modern evergreen browsers; no IE11 support required.
-
----
+- A MySQL (or TiDB) instance is accessible and configured.
+- Vercel environment supports required Node.js version (≥18).
+- Valid Resend API key and SMTP configuration available.
+- JWT_SECRET and other environment variables securely stored in Vercel.
+- No external OAuth or SSO integrations at this stage.
+- Modern evergreen browsers targeted (Chrome, Firefox, Safari, Edge).
 
 ## 8. Known Issues & Potential Pitfalls
-
-- **Static Data Limitation**: `data.json` is only for demo. A real API or database will be needed to avoid stale data.
-  *Mitigation*: Define a clear interface for data fetching so swapping to a live endpoint is trivial.
-
-- **Global CSS Conflicts**: Using global styles can lead to unintended overrides.
-  *Mitigation*: Plan to migrate to CSS Modules or utility-first CSS in Phase 2.
-
-- **API Route Ambiguity**: Single `/api/auth/route.ts` handling both sign-up and sign-in could get complex.
-  *Mitigation*: Clearly branch on HTTP method (`POST /register` vs. `POST /login`) or split into separate files.
-
-- **Lack of Testing**: No test suite means regressions can slip in.
-  *Mitigation*: Build a minimal Jest + React Testing Library setup in an early iteration.
-
-- **Error Handling Gaps**: Client and server must handle edge cases (network failures, malformed input).
-  *Mitigation*: Define a standard error response schema and show user-friendly messages.
+- **Database Migrations**: Keep Prisma schema and prod/dev branches in sync; add CI checks.
+- **JWT Expiry & Refresh**: Decide on token lifetime or add refresh-token flow later.
+- **Email Rate Limits**: Monitor Resend usage; queue emails if limits approached.
+- **Chart Hydration**: Use dynamic import (`ssr: false`) to avoid SSR/client mismatch.
+- **Soft-Delete Consistency**: Ensure queries exclude `deletedAt` rows by default.
+- **Cookie Domain/Path**: Configure correctly for subdomains or custom domains.
+- **Seed Idempotency**: Make seed script safe to rerun without duplicating master data.
 
 ---
 
-This PRD should serve as the single source of truth for the AI model or any developer generating the next set of technical documents: Tech Stack Doc, Frontend Guidelines, Backend Structure, App Flow, File Structure, and IDE Rules. It contains all functional and non-functional requirements with no ambiguity, enabling seamless downstream development.
+This document serves as the single source of truth for all subsequent technical specifications (Tech Stack docs, Frontend/Backend guidelines, file structure, middleware rules, etc.). All requirements, flows, and constraints are clearly defined to avoid ambiguity and enable smooth, parallel development by AI or engineering teams.

@@ -1,14 +1,1 @@
-flowchart TD
-  Start[Landing Page]
-  SignUpPage[Sign Up Page]
-  SignInPage[Sign In Page]
-  AuthAPI[Authentication API Endpoint]
-  DashboardPage[Dashboard Page]
-  Start -->|Select Sign Up| SignUpPage
-  Start -->|Select Sign In| SignInPage
-  SignUpPage -->|Submit Credentials| AuthAPI
-  SignInPage -->|Submit Credentials| AuthAPI
-  AuthAPI -->|Success| DashboardPage
-  AuthAPI -->|Error| SignUpPage
-  AuthAPI -->|Error| SignInPage
-  DashboardPage -->|Click Logout| Start
+flowchart TD\n    Start[Public Landing Page] --> Login[Login Page]\n    Start --> Register[Register Page]\n    Login --> AuthCheck{Authentication Successful}\n    AuthCheck -->|Yes| Dashboard[Dashboard]\n    AuthCheck -->|No| Login\n    Register --> RegisterCheck{Registration Successful}\n    RegisterCheck -->|Yes| Dashboard\n    RegisterCheck -->|No| Register\n    Dashboard --> Comics[Comics Page]\n    Dashboard --> Master[Master Data Page]\n    Dashboard --> Settings[Settings Page]\n    Dashboard --> Logout[Logout]\n    Logout --> Login

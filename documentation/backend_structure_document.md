@@ -1,179 +1,303 @@
 # Backend Structure Document
 
-This document outlines the backend architecture, hosting, and infrastructure for the **codeguide-starter** project. It uses plain language so anyone can understand how the backend is set up and how it supports the application.
-
 ## 1. Backend Architecture
 
-- **Framework and Design Pattern**
-  - We use **Next.js API Routes** to handle all server-side logic. These routes live alongside the frontend code in the same repository, making development and deployment simpler.
-  - The backend follows a **layered pattern**:
-    1. **API Layer**: Receives requests (login, registration, data fetch).  
-    2. **Service Layer**: Contains the core business logic (user validation, password hashing).  
-    3. **Data Access Layer**: Talks to the database via a simple ORM (e.g., Prisma or TypeORM).
+Overall, our backend is built around a modern Next.js setup, using the App Router and API Routes for server-side logic. We follow these design patterns and frameworks:
 
-- **Scalability**
-  - Stateless API routes can scale horizontally—new instances can spin up on demand.  
-  - We can add caching or a message queue (e.g., Redis or RabbitMQ) without changing the core code.
+• Next.js App Router
+  • Enables a hybrid of server-rendered and client-rendered pages
+  • File-based routing makes it easy to organize public, auth, and protected areas
 
-- **Maintainability**
-  - Code for each feature is grouped by route (authentication, dashboard).  
-  - A service layer separates complex logic from request handling.
+• API Routes (REST-style)
+  • Each folder under `/api` corresponds to a group of related endpoints
+  • Handlers written in TypeScript for consistency and type safety
 
-- **Performance**
-  - Lightweight Node.js handlers keep response times low.  
-  - Future use of database connection pooling and Redis for caching repeated queries.
+• Middleware for Route Protection
+  • A global `middleware.ts` file inspects an `auth_token` cookie on every request
+  • Verifies the JWT, extracts the user’s role, and applies allowlist/blocklist rules
+
+• Singleton Pattern for Database Client
+  • A single Prisma client instance (`lib/db.ts`) is shared across requests
+  • Prevents connection exhaustion and improves performance
+
+How this supports our goals:
+
+• Scalability
+  • Next.js serverless functions auto-scale on Vercel
+  • Prisma connection pooling ensures efficient database usage
+
+• Maintainability
+  • Clear separation of concerns: auth, data access, validation, and presentation are in distinct folders
+  • TypeScript and Zod schemas catch errors at build time
+
+• Performance
+  • Server Components handle initial data fetching on the server
+  • Optimized Prisma queries reduce over-fetching and improve query speeds
 
 ## 2. Database Management
 
-- **Database Choice**
-  - We recommend **PostgreSQL** for structured data and reliable transactions.  
-  - In-memory caching can be added later with **Redis** for session tokens or frequently read data.
+We use a relational database that can scale horizontally:
 
-- **Data Storage and Access**
-  - Use an ORM like **Prisma** or **TypeORM** to map JavaScript/TypeScript objects to database tables.
-  - Connection pooling ensures efficient use of database connections under load.
-  - Migrations track schema changes over time, keeping development, staging, and production in sync.
+• Database Type: MySQL-compatible (e.g., TiDB or MySQL)
+• ORM: Prisma
 
-- **Data Practices**
-  - Passwords are never stored in plain text—they are salted and hashed with **bcrypt** before saving.
-  - All outgoing data is typed and validated to prevent malformed records.
+Key data management practices:
+
+• Data Modeling
+  • Entities are defined in `prisma/schema.prisma` and migrated via Prisma Migrate
+  • Master data (types, statuses, genres, platforms) seeded with a `memberLocked` flag
+
+• Soft Deletes
+  • A `deletedAt` timestamp column marks records as deleted without removing them
+  • Enables a recycle bin feature and easy restores
+
+• Connection Handling
+  • Prisma client singleton prevents opening new connections on every request
+  • Uses environment variable `DATABASE_URL` for connection string
+
+• Migrations and Seeding
+  • Migrations managed through `npx prisma migrate` commands
+  • A seed script (`prisma/seed.ts`) populates default master data on setup
 
 ## 3. Database Schema
 
-### Human-Readable Format
+Below is a human-readable summary followed by the SQL definitions for key tables.
 
-- **Users**
-  - **id**: Unique identifier  
-  - **email**: User’s email address (unique)  
-  - **password_hash**: Securely hashed password  
-  - **created_at**: Account creation timestamp
+### Human-Readable Schema Overview
 
-- **Sessions**
-  - **id**: Unique session record  
-  - **user_id**: Links to a user  
-  - **token**: Random string for authentication  
-  - **expires_at**: When the token stops working  
-  - **created_at**: When the session was created
+• Users
+  • Stores registered user details, hashed passwords, roles, and timestamps
 
-- **DashboardItems** *(optional for dynamic data)*
-  - **id**: Unique record  
-  - **title**: Item title  
-  - **content**: Item details  
-  - **created_at**: When the item was added
+• PasswordResetTokens
+  • Tracks one-time tokens for password resets with expiration
 
-### SQL Schema (PostgreSQL)
+• Master Data Tables (Types, Statuses, Genres, Platforms)
+  • Each table contains a name, a `memberLocked` flag, and timestamps
+
+• Comics
+  • Each comic record links to a user and master data entries
+  • Tracks reading progress, soft delete status, and timestamps
+
+• Settings
+  • Stores user preferences such as theme (light/dark)
+
+• ActivityLogs
+  • Records user actions (create, update, delete) for audit and history
+
+### SQL Schema (MySQL)
+
 ```sql
--- Users table
-CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- Users
+drop table if exists User;
+create table User (
+  id            char(36)      not null primary key,
+  email         varchar(255)  not null unique,
+  passwordHash  varchar(255)  not null,
+  role          enum('member','admin') default 'member',
+  createdAt     datetime      default current_timestamp,
+  updatedAt     datetime      default current_timestamp on update current_timestamp
 );
 
--- Sessions table
-CREATE TABLE sessions (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- Password Reset Tokens
+drop table if exists PasswordResetToken;
+create table PasswordResetToken (
+  id         char(36)      not null primary key,
+  token      varchar(255)  not null unique,
+  userId     char(36)      not null,
+  expiresAt  datetime      not null,
+  used       boolean       default false,
+  foreign key (userId) references User(id)
 );
 
--- Dashboard items table
-CREATE TABLE dashboard_items (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- Master Data Tables
+-- Types, Statuses, Genres, Platforms share the same structure:
+create table Type (
+  id            int           not null auto_increment primary key,
+  name          varchar(100)  not null unique,
+  memberLocked  boolean       default true,
+  createdAt     datetime      default current_timestamp,
+  updatedAt     datetime      default current_timestamp on update current_timestamp
+);
+
+-- Repeat the above block for Status, Genre, Platform by renaming the table
+
+-- Comics
+drop table if exists Comic;
+create table Comic (
+  id             char(36)      not null primary key,
+  title          varchar(255)  not null,
+  description    text,
+  typeId         int           not null,
+  statusId       int           not null,
+  genreId        int           not null,
+  platformId     int           not null,
+  chaptersRead   int           default 0,
+  totalChapters  int           default 0,
+  userId         char(36)      not null,
+  deletedAt      datetime,
+  createdAt      datetime      default current_timestamp,
+  updatedAt      datetime      default current_timestamp on update current_timestamp,
+  foreign key (typeId) references Type(id),
+  foreign key (statusId) references Status(id),
+  foreign key (genreId) references Genre(id),
+  foreign key (platformId) references Platform(id),
+  foreign key (userId) references User(id)
+);
+
+-- Settings
+drop table if exists Setting;
+create table Setting (
+  id        char(36)     not null primary key,
+  userId    char(36)     not null unique,
+  theme     enum('light','dark') default 'light',
+  foreign key (userId) references User(id)
+);
+
+-- Activity Logs
+drop table if exists ActivityLog;
+create table ActivityLog (
+  id          char(36)      not null primary key,
+  userId      char(36)      not null,
+  action      varchar(50)   not null,
+  entityType  varchar(50)   not null,
+  entityId    varchar(36)   not null,
+  timestamp   datetime      default current_timestamp,
+  foreign key (userId) references User(id)
 );
 ```  
 
 ## 4. API Design and Endpoints
 
-- **Approach**: We follow a **RESTful** style, grouping related endpoints under `/api` directories.
+We follow a RESTful approach with clear, resource-based endpoints. All routes live under `/api`.
 
-- **Key Endpoints**
-  - `POST /api/auth/register`  
-    • Accepts `{ email, password }`  
-    • Creates a new user and issues a session token  
-  - `POST /api/auth/login`  
-    • Accepts `{ email, password }`  
-    • Verifies credentials and returns a session token  
-  - `POST /api/auth/logout`  
-    • Invalidates the session token on the server  
-  - `GET /api/dashboard/data`  
-    • Requires a valid session  
-    • Returns user-specific data or dashboard items  
+• Auth Endpoints (`/api/auth`)
+  • POST `/register` – Create a new user (returns a JWT in an HttpOnly cookie)
+  • POST `/login` – Authenticate user and set Jwt cookie
+  • POST `/logout` – Clear the auth cookie
+  • POST `/forgot` – Request password reset (sends email via Resend)
+  • POST `/reset` – Reset password using token
 
-- **Communication**
-  - Frontend sends JSON requests; backend replies with JSON and appropriate HTTP status codes.  
-  - Protected routes check for a valid session token (in cookies or Authorization header).
+• Comic Endpoints (`/api/comics`)
+  • GET `/` – List comics with filtering, sorting, pagination
+  • POST `/` – Create new comic
+  • GET `/:id` – Get one comic’s details
+  • PUT `/:id` – Update comic (including soft delete)
+  • DELETE `/:id` – Soft-delete a comic (sets `deletedAt`)
+
+• Master Data Endpoints (`/api/enums`)
+  • GET `/types`, `/statuses`, `/genres`, `/platforms` – Fetch default and custom entries
+  • POST, PUT, DELETE on each resource – Custom entries only (respect `memberLocked` rules)
+
+• Settings Endpoint (`/api/settings`)
+  • GET `/` – Get user’s settings
+  • PUT `/` – Update user’s settings (theme, etc.)
+
+• Utility Endpoints
+  • GET `/export` – Export user’s collection as JSON
+  • GET `/activity` – List activity logs for the user
+
+Each endpoint validates input with Zod, ensures the user is authenticated (if required), and returns standardized JSON.
 
 ## 5. Hosting Solutions
 
-- **Cloud Provider**:  
-  - **Vercel** (recommended) offers seamless Next.js deployments, auto-scaling, and built-in CDN.  
-  - Alternatively, **Netlify** or any Node.js-capable host will work.
+• Development
+  • Docker & docker-compose spin up Next.js and MySQL
+  • Mirrors production as closely as possible
 
-- **Benefits**
-  - **Reliability**: Global servers and failover across regions.  
-  - **Scalability**: Auto-scale serverless functions based on traffic.  
-  - **Cost-Effectiveness**: Pay-per-use model means low cost for small projects.
+• Production
+  • Vercel for Next.js App Router and API Routes
+  • Managed MySQL (e.g., PlanetScale, TiDB Cloud, Amazon RDS)
+
+Benefits:
+
+• Reliability
+  • Vercel provides built-in health checks, redundancy, and automatic failover
+  • Managed database services handle backups and recovery
+
+• Scalability
+  • Serverless functions on Vercel auto-scale to meet traffic spikes
+  • TiDB/MySQL can scale horizontally for large datasets
+
+• Cost-Effectiveness
+  • Pay-as-you-go pricing on Vercel minimizes idle server costs
+  • Managed database tiers let you choose capacity that fits your budget
 
 ## 6. Infrastructure Components
 
-- **Load Balancer**
-  - Provided by the hosting platform—distributes API requests across function instances.
+• Load Balancing
+  • Vercel’s global edge network distributes incoming traffic across regions
 
-- **CDN (Content Delivery Network)**
-  - Vercel’s global edge network caches static assets (CSS, JS, images) for faster page loads.
+• Content Delivery Network (CDN)
+  • Static assets (JS, CSS, images) are cached at Vercel’s edge nodes
 
-- **Caching**
-  - **Redis** (optional) for session storage or caching dashboard queries to reduce database load.
+• Caching
+  • Next.js ISR/SSG caching for published pages
+  • Client-side caching with SWR for fast revalidation of data
 
-- **Object Storage**
-  - For file uploads or backups, integrate with AWS S3 or similar services.
+• Containerization
+  • Dockerfile defines the Next.js service image
+  • docker-compose configures local MySQL and the app side by side
 
-- **Message Queue**
-  - In future, use **RabbitMQ** or **Kafka** for background tasks (e.g., email notifications).
+• Email Delivery
+  • Resend service handles transactional email for password resets and confirmations
 
 ## 7. Security Measures
 
-- **Authentication & Authorization**
-  - Passwords hashed with **bcrypt** and salted.  
-  - Session tokens stored in secure, HttpOnly cookies or Authorization headers.  
-  - Protected endpoints verify tokens before proceeding.
+• Authentication & Authorization
+  • JWTs signed with a strong secret (`JWT_SECRET`) and stored in HttpOnly cookies
+  • Middleware enforces protected routes and checks user roles for RBAC
 
-- **Data Encryption**
-  - **HTTPS/TLS** encrypts data in transit.  
-  - Database connections use SSL to encrypt data between the app and the database.
+• Password Protection
+  • bcrypt hashes all user passwords before storage
 
-- **Input Validation**
-  - Every incoming request is validated (e.g., valid email format, password length) to prevent SQL injection or other attacks.
+• Data Validation
+  • Zod schemas validate all incoming request bodies and query parameters
 
-- **Web Security Best Practices**
-  - Enable **CORS** policies to limit allowed origins.  
-  - Use **CSRF tokens** or same-site cookies to prevent cross-site requests.  
-  - Set secure headers with **Helmet** or a similar middleware.
+• Encryption & Transport
+  • HTTPS enforced for all API and frontend traffic
+
+• Rate Limiting & Headers
+  • Optionally implement rate limiting middleware to prevent abuse
+  • Set secure HTTP headers (e.g., via Helmet) to protect against common web attacks
+
+• Regulatory Compliance
+  • User data is stored securely and only minimal personal data (email) is kept
+  • Audit logs (ActivityLog) track user actions for accountability
 
 ## 8. Monitoring and Maintenance
 
-- **Performance Monitoring**
-  - Integrate **Sentry** or **LogRocket** for real-time crash reporting and performance tracing.  
-  - Use Vercel’s built-in analytics to track request latencies and error rates.
+• Performance Monitoring
+  • Vercel Analytics tracks request latencies and error rates
+  • Database metrics monitored via managed DB dashboards
 
-- **Logging**
-  - Structured logs (JSON) for all API requests and errors, shipped to a log management service like **Datadog** or **Logflare**.
+• Error Tracking
+  • Integrate Sentry (or similar) to capture runtime exceptions and stack traces
 
-- **Health Checks**
-  - Define a `/health` endpoint that returns a 200 status if the service is up and the database is reachable.
+• Logging
+  • Structured logs from API routes and middleware are collected by Vercel
 
-- **Maintenance Strategies**
-  - Automated migrations run on deploy to keep the database schema up to date.  
-  - Scheduled dependency audits and security scans (e.g., `npm audit`).
-  - Regular backups of the database (daily or weekly depending on usage).
+• Testing & CI/CD
+  • GitHub Actions run unit tests (Zod validations, helper functions) and integration tests (API routes) on every push
+  • End-to-end tests verify user flows like login, comic CRUD, and password reset
+
+• Maintenance Practices
+  • Regular Prisma migrations and schema reviews
+  • Seed scripts updated alongside master data changes
+  • Dependency updates and security patching via automated tooling (Dependabot)
 
 ## 9. Conclusion and Overall Backend Summary
 
-The backend for **codeguide-starter** is built on Next.js API Routes and Node.js, paired with PostgreSQL for data and optional Redis for caching. It follows a clear layered architecture that keeps code easy to maintain and extend. With RESTful endpoints for authentication and data, secure practices like password hashing and HTTPS, and hosting on Vercel for scalability and global performance, this setup meets the project’s goals for a fast, secure, and developer-friendly foundation. Future enhancements—such as background job queues, advanced monitoring, or richer data models—can be added without disrupting the core structure.
+This backend structure brings together a robust, scalable, and secure foundation for your Komik Tracker application. By using Next.js App Router and serverless API Routes, Prisma with a MySQL-compatible database, and JWT-based authentication, we achieve:
+
+• A clear separation of concerns that simplifies maintenance and onboarding
+• An auto-scaling, global deployment model on Vercel for high performance
+• Industry-standard security practices that protect user data and comply with regulations
+
+Unique strengths:
+
+• Hybrid SSR/Client rendering balances SEO and interactivity
+• Soft deletes and a recycle bin provide data safety for users
+• Role-based access control enforced via JWTs and middleware
+• Containerized local development ensures parity with production
+
+With this setup, your team can confidently build and extend the Komik Tracker features, knowing the backend will reliably support growth and evolving requirements.

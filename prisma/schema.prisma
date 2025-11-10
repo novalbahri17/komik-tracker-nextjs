@@ -1,0 +1,232 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  member
+}
+
+enum ActionType {
+  CREATE_COMIC
+  UPDATE_COMIC
+  DELETE_COMIC
+  RESTORE_COMIC
+  PERMANENT_DELETE_COMIC
+  INCREMENT_CHAPTER
+  COMPLETE_COMIC
+  CREATE_TYPE
+  UPDATE_TYPE
+  DELETE_TYPE
+  CREATE_STATUS
+  UPDATE_STATUS
+  DELETE_STATUS
+  CREATE_GENRE
+  UPDATE_GENRE
+  DELETE_GENRE
+  CREATE_PLATFORM
+  UPDATE_PLATFORM
+  DELETE_PLATFORM
+  UPDATE_PROFILE
+  CHANGE_PASSWORD
+}
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String?   @map("full_name")
+  role         UserRole  @default(member)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  comics           Comic[]
+  customTypes      Type[]      @relation("TypeOwner")
+  customStatuses   Status[]    @relation("StatusOwner")
+  customGenres     Genre[]     @relation("GenreOwner")
+  customPlatforms  Platform[]  @relation("PlatformOwner")
+  activityLogs     ActivityLog[]
+  passwordResetTokens PasswordResetToken[]
+  appSettings      AppSettings?
+
+  @@map("users")
+}
+
+model Type {
+  id            String  @id @default(cuid())
+  name          String
+  slug          String  @unique
+  color         String?
+  memberLocked  Boolean @default(true) @map("member_locked")
+  userId        String? @map("user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user   User?   @relation("TypeOwner", fields: [userId], references: [id], onDelete: Cascade)
+  comics Comic[]
+
+  @@index([userId])
+  @@map("types")
+}
+
+model Status {
+  id            String  @id @default(cuid())
+  name          String
+  slug          String  @unique
+  color         String?
+  memberLocked  Boolean @default(true) @map("member_locked")
+  userId        String? @map("user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user   User?   @relation("StatusOwner", fields: [userId], references: [id], onDelete: Cascade)
+  comics Comic[]
+
+  @@index([userId])
+  @@map("statuses")
+}
+
+model Genre {
+  id            String  @id @default(cuid())
+  name          String
+  slug          String  @unique
+  color         String?
+  memberLocked  Boolean @default(true) @map("member_locked")
+  userId        String? @map("user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user   User?   @relation("GenreOwner", fields: [userId], references: [id], onDelete: Cascade)
+  comics ComicGenre[]
+
+  @@index([userId])
+  @@map("genres")
+}
+
+model Platform {
+  id            String  @id @default(cuid())
+  name          String
+  slug          String  @unique
+  color         String?
+  memberLocked  Boolean @default(true) @map("member_locked")
+  userId        String? @map("user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user   User?   @relation("PlatformOwner", fields: [userId], references: [id], onDelete: Cascade)
+  comics Comic[]
+
+  @@index([userId])
+  @@map("platforms")
+}
+
+model Comic {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  title          String
+  normalizedTitle String   @map("normalized_title")
+  authorArtist   String?   @map("author_artist")
+  typeId         String    @map("type_id")
+  statusId       String    @map("status_id")
+  platformId     String?   @map("platform_id")
+  lastChapter    Int       @default(0) @map("last_chapter")
+  notes          String?
+  linkUrl        String?   @map("link_url")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  // Relations
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type     Type        @relation(fields: [typeId], references: [id])
+  status   Status      @relation(fields: [statusId], references: [id])
+  platform Platform?  @relation(fields: [platformId], references: [id])
+  genres   ComicGenre[]
+  activityLogs ActivityLog[]
+
+  @@index([userId])
+  @@index([deletedAt])
+  @@index([normalizedTitle])
+  @@index([typeId])
+  @@index([statusId])
+  @@index([platformId])
+  @@map("comics")
+}
+
+model ComicGenre {
+  comicId String @map("comic_id")
+  genreId String @map("genre_id")
+
+  // Relations
+  comic Comic @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([comicId, genreId])
+  @@map("comic_genres")
+}
+
+model ActivityLog {
+  id         String      @id @default(cuid())
+  userId     String      @map("user_id")
+  comicId    String?     @map("comic_id")
+  actionType ActionType  @map("action_type")
+  meta       Json?
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comic Comic? @relation(fields: [comicId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([comicId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  tokenHash  String   @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model AppSettings {
+  id           String   @id @default(cuid())
+  userId       String   @unique @map("user_id")
+  themePreset  String?  @map("theme_preset")
+  darkMode     Boolean  @default(false) @map("dark_mode")
+  pageSize     Int      @default(20) @map("page_size")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("app_settings")
+}

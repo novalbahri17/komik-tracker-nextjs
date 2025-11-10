@@ -1,90 +1,119 @@
-# Tech Stack Document
+# Komik Tracker Next.js - Tech Stack Document
 
-This document explains the key technologies chosen for the **codeguide-starter** project. It’s written in everyday language so anyone—technical or not—can understand why each tool was picked and how it supports the application.
+This document explains the technology choices for the Komik Tracker Next.js application in everyday language. It shows how each tool and library helps us build a secure, fast, and user-friendly comic-tracking platform.
 
 ## 1. Frontend Technologies
-The frontend is everything the user sees and interacts with. For this project, we’ve used:
+
+We chose a modern React-based stack to create an interactive, responsive user interface.
 
 - **Next.js (App Router)**
-  - A React framework that makes page routing, server-side rendering, and API routes very simple.
-  - Enhances user experience by pre-rendering pages on the server or at build time, leading to faster initial load.
-- **React 18**
-  - The underlying library for building user interfaces with reusable components.
-  - Provides a smooth, interactive experience thanks to its virtual DOM and modern hooks.
-- **TypeScript**
-  - A superset of JavaScript that adds types (labels for data).
-  - Helps catch errors early during development and makes the code easier to maintain.
-- **CSS (globals.css & theme.css)**
-  - **globals.css** applies base styles (fonts, colors, resets) across the entire app.
-  - **dashboard/theme.css** defines the look and feel specific to the dashboard area.
-  - This separation keeps styles organized and avoids accidental style conflicts.
+  - Provides a hybrid of server-side rendering (SSR) and single-page app (SPA) behavior.
+  - File-based routing makes it easy to organize pages into public, auth, and protected sections.
+  - Server Components let us fetch data on the server for faster page loads.
 
-By combining these tools, we have a clear structure (Next.js folders for pages and layouts), safer code (TypeScript), and flexible styling with vanilla CSS.
+- **TypeScript**
+  - Adds type checking to JavaScript, reducing bugs and improving developer productivity.
+
+- **Tailwind CSS**
+  - A utility-first CSS framework for rapid styling without leaving your HTML.
+  - Built-in support for dark/light mode theming.
+
+- **shadcn/ui & lucide-react**
+  - A collection of pre-built, themeable UI components (buttons, cards, tables, dialogs, toasts).
+  - Lucide icons provide a consistent icon set throughout the app.
+
+- **react-hook-form & Zod**
+  - `react-hook-form` manages form state efficiently with minimal re-renders.
+  - `Zod` schemas define and validate data shapes in TypeScript, ensuring reliable user input.
+
+- **react-chartjs-2**
+  - A React wrapper around Chart.js to display Pie and Bar charts for dashboard metrics.
 
 ## 2. Backend Technologies
-The backend handles data, user accounts, and the logic behind the scenes. Our choices here are:
+
+Our backend runs on Next.js API routes and connects to a MySQL-compatible database through Prisma.
 
 - **Next.js API Routes**
-  - Allows us to write server-side code (`route.ts` files) alongside our frontend in the same project.
-  - Runs on Node.js, so we can handle requests like sign-up, sign-in, and data fetching in one place.
-- **Node.js Runtime**
-  - The JavaScript environment on the server that executes our API routes.
-- **bcrypt** (npm package)
-  - A library for hashing passwords securely before storing them.
-  - Ensures that even if someone got access to our data, raw passwords aren’t visible.
-- **(Optional) NextAuth.js or JWT**
-  - While this starter kit shows a custom authentication flow, it can easily integrate services like NextAuth.js for email-based login or JWT (JSON Web Tokens) for stateless sessions.
+  - Handle registration, login, logout, password reset, and CRUD operations for comics and master data.
+  - Live alongside pages in the same codebase for seamless development.
 
-These components work together to receive user credentials, verify or store them securely, manage sessions or tokens, and deliver protected data back to the frontend.
+- **Prisma ORM + MySQL/TiDB**
+  - Prisma provides a type-safe way to define data models (User, Comic, Genre, Platform, etc.) and run database queries.
+  - We use a MySQL-compatible database (TiDB or MySQL) for reliable, scalable storage.
+  - A singleton Prisma client in `lib/db.ts` ensures efficient database connections.
+
+- **jsonwebtoken & bcrypt**
+  - `bcrypt` hashes user passwords before storing them in the database.
+  - `jsonwebtoken` signs and verifies JWTs to manage user sessions.
+  - Tokens are stored in HttpOnly cookies for safety.
+
+- **Custom Middleware (`middleware.ts`)**
+  - Checks the `auth_token` cookie on each request.
+  - Verifies the JWT and redirects unauthenticated users away from protected routes.
 
 ## 3. Infrastructure and Deployment
-Infrastructure covers where and how we host the app, as well as how changes get delivered:
+
+To ensure reliability, consistency, and easy deployments, we use containerization, version control, and a modern hosting platform.
+
+- **Docker & docker-compose**
+  - A `Dockerfile` brings up the Next.js app containerized.
+  - `docker-compose.yaml` runs both the app and a local MySQL instance together, mirroring production.
 
 - **Git & GitHub**
-  - Version control system (Git) and remote hosting (GitHub) keep track of all code changes and allow team collaboration.
-- **Vercel (or Netlify)**
-  - A popular hosting service optimized for Next.js, with one-click deployments and global content delivery.
-  - Automatically rebuilds and deploys the site whenever code is pushed to the main branch.
-- **GitHub Actions (CI/CD)**
-  - Automates tasks like linting (ESLint), formatting (Prettier), and running any tests you add.
-  - Ensures that only clean, tested code goes live.
+  - Source code lives in a Git repository for version control and collaboration.
+  - Pull requests and code reviews help maintain code quality.
 
-Together, these tools provide a reliable, scalable setup where every code change is tested and deployed quickly, with minimal manual work.
+- **CI/CD (Vercel)**
+  - On each push to main, Vercel automatically builds and deploys the app.
+  - Environment variables (DATABASE_URL, JWT_SECRET, RESEND_API_KEY) are managed securely in Vercel’s dashboard.
+  - Tests (unit, integration, end-to-end) run before every deployment to catch regressions early.
 
 ## 4. Third-Party Integrations
-While this starter kit is minimal by design, it already includes or can easily add:
 
-- **bcrypt**
-  - For secure password hashing (included as an npm dependency).
-- **NextAuth.js** (optional)
-  - A full-featured authentication library supporting email/password, OAuth, and more.
-- **Sentry or LogRocket** (optional)
-  - For real-time error tracking and performance monitoring in production.
+We integrate external services to handle email delivery, analytics, and more.
 
-These integrations help extend the app’s capabilities without building every feature from scratch.
+- **Resend**
+  - A transactional email service used to send password reset emails and confirmations.
+  - Generates and verifies short-lived, single-use tokens for secure password resets.
+
+- **Chart.js (via react-chartjs-2)**
+  - Delivers interactive data visualizations (tooltips, filtering, drill-downs) in the dashboard.
+
+- **Optional Analytics** (future)
+  - Can plug in services like Google Analytics or Plausible to track user behavior and app performance.
 
 ## 5. Security and Performance Considerations
-We’ve baked in several measures to keep users safe and the app running smoothly:
 
-Security:
-- Passwords are never stored in plain text—bcrypt hashes them with a random salt.
-- API routes can implement CSRF protection and input validation to block malicious requests.
-- Session tokens or cookies are marked secure and HttpOnly to prevent theft via JavaScript.
+We’ve built in safeguards and optimizations to keep data safe and the app snappy.
 
-Performance:
-- Server-side rendering (SSR) and static site generation (SSG) in Next.js deliver pages faster.
-- Code splitting and lazy-loaded components ensure users only download what they need.
-- Global CSS and theme files are small and cached by the browser for quick repeat visits.
+- **Authentication & Authorization**
+  - Passwords hashed with `bcrypt`.
+  - JWTs stored in HttpOnly cookies to prevent cross-site scripting (XSS) attacks.
+  - Role information inside JWTs enforces Role-Based Access Control (RBAC) on APIs and pages.
 
-These strategies work together to give users a fast, secure experience every time.
+- **Data Validation**
+  - Zod schemas validate both form input on the client and request bodies on the server.
+  - Prevents invalid data from reaching the database.
+
+- **Performance Optimizations**
+  - Next.js Server Components and SSR reduce initial load times.
+  - Prisma queries include filters, sorting, and pagination at the database level for efficient data retrieval.
+  - Debounced search and pagination reduce excessive network requests in large data tables.
+
+- **Secure Configuration**
+  - Environment variables keep secrets out of the codebase.
+  - HTTPS enforced in production environments.
 
 ## 6. Conclusion and Overall Tech Stack Summary
-In building **codeguide-starter**, we chose technologies that:
 
-- Align with modern web standards (Next.js, React, TypeScript).
-- Provide a clear, file-based project structure for rapid onboarding.
-- Offer built-in support for server-side rendering, API routes, and static assets.
-- Emphasize security through password hashing, session management, and safe defaults.
-- Enable easy scaling and future enhancements via modular code and optional integrations.
+By combining Next.js with TypeScript, Tailwind CSS, and Prisma, we achieve a modern, full-stack foundation that balances developer productivity with security and performance. 
 
-This stack strikes a balance between simplicity for newcomers and flexibility for experienced teams. It accelerates development of a secure authentication flow and a polished dashboard, while leaving room to plug in databases, test suites, and advanced features as the project grows.
+Unique aspects that set this project apart:
+
+- **Unified Codebase**: Pages, API routes, and middleware all live together in Next.js, simplifying development and deployment.
+- **UI Consistency**: shadcn/ui and Tailwind CSS provide a cohesive, themeable design system from day one.
+- **Scalable Data Layer**: Prisma with a MySQL-compatible database offers type-safe models, efficient queries, and easy migrations.
+- **Robust Auth**: Custom JWT flows, HttpOnly cookies, and RBAC ensure only authorized users can access or modify data.
+- **Containerized Workflow**: Docker and docker-compose deliver consistent environments for development and production.
+
+Together, these technologies deliver a secure, performant, and user-friendly Komik Tracker application that can scale and evolve with your needs.
